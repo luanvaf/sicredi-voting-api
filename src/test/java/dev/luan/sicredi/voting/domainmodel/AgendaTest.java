@@ -36,4 +36,33 @@ class AgendaTest {
             () -> new Agenda(AgendaId.newId(), "   ", null, Instant.parse("2026-07-19T12:00:00Z")))
         .withMessage("Agenda title must not be blank");
   }
+
+  @Test
+  void shouldRejectATitleAboveItsMaximumLength() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                new Agenda(
+                    AgendaId.newId(),
+                    "a".repeat(Agenda.MAXIMUM_TITLE_LENGTH + 1),
+                    null,
+                    Instant.parse("2026-07-19T12:00:00Z")))
+        .withMessage("Agenda title must not exceed " + Agenda.MAXIMUM_TITLE_LENGTH + " characters");
+  }
+
+  @Test
+  void shouldRejectADescriptionAboveItsMaximumLength() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                new Agenda(
+                    AgendaId.newId(),
+                    "Annual budget",
+                    "a".repeat(Agenda.MAXIMUM_DESCRIPTION_LENGTH + 1),
+                    Instant.parse("2026-07-19T12:00:00Z")))
+        .withMessage(
+            "Agenda description must not exceed "
+                + Agenda.MAXIMUM_DESCRIPTION_LENGTH
+                + " characters");
+  }
 }

@@ -28,6 +28,50 @@ class VotingSessionTest {
   }
 
   @Test
+  void shouldReportExpirationAtAndAfterClosing() {
+    VotingSession session = VotingSession.open(AgendaId.newId(), OPENED_AT, Duration.ofMinutes(1));
+
+    assertThat(session.isExpiredAt(OPENED_AT.plusSeconds(59))).isFalse();
+    assertThat(session.isExpiredAt(OPENED_AT.plusSeconds(60))).isTrue();
+    assertThat(session.isExpiredAt(OPENED_AT.plusSeconds(61))).isTrue();
+  }
+
+  @Test
+  void shouldRejectANonIncreasingClosingTimestamp() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                new VotingSession(
+                    VotingSessionId.newId(), AgendaId.newId(), OPENED_AT, OPENED_AT, null))
+        .withMessage("Voting session closing timestamp must be after its opening timestamp");
+  }
+
+  @Test
+  void shouldRejectAFinalizationBeforeClosing() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                new VotingSession(
+                    VotingSessionId.newId(),
+                    AgendaId.newId(),
+                    OPENED_AT,
+                    OPENED_AT.plusSeconds(60),
+                    OPENED_AT.plusSeconds(59)))
+        .withMessage(
+            "Voting session finalization timestamp must not be before its closing timestamp");
+  }
+
+  @Test
+  void shouldRejectZeroAndNegativeDurations() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> VotingSession.open(AgendaId.newId(), OPENED_AT, Duration.ZERO))
+        .withMessage("Voting session duration must be positive");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> VotingSession.open(AgendaId.newId(), OPENED_AT, Duration.ofSeconds(-1)))
+        .withMessage("Voting session duration must be positive");
+  }
+
+  @Test
   void shouldRejectFinalizationBeforeClosing() {
     VotingSession session = VotingSession.open(AgendaId.newId(), OPENED_AT, Duration.ofMinutes(1));
 
