@@ -241,6 +241,29 @@ class VotingApiIntegrationTest {
     assertThat(paths.has("/api/v1/agendas/{agendaId}/result")).isTrue();
   }
 
+  @Test
+  void shouldPreserveStandardHttpProtocolErrors() throws Exception {
+    assertProblem(getApi("/api/v1/does-not-exist"), 404, "RESOURCE_NOT_FOUND");
+    assertProblem(getApi("/api/v1/agendas"), 405, "METHOD_NOT_ALLOWED");
+
+    HttpRequest unsupportedMediaType =
+        HttpRequest.newBuilder(uri("/api/v1/agendas"))
+            .timeout(Duration.ofSeconds(10))
+            .header("Content-Type", "text/plain")
+            .POST(HttpRequest.BodyPublishers.ofString("{\"title\":\"Protocol test\"}"))
+            .build();
+    assertProblem(send(unsupportedMediaType), 415, "UNSUPPORTED_MEDIA_TYPE");
+
+    HttpRequest unacceptableMediaType =
+        HttpRequest.newBuilder(uri("/api/v1/agendas"))
+            .timeout(Duration.ofSeconds(10))
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/xml")
+            .POST(HttpRequest.BodyPublishers.ofString("{\"title\":\"Protocol test\"}"))
+            .build();
+    assertProblem(send(unacceptableMediaType), 406, "NOT_ACCEPTABLE");
+  }
+
   private UUID createAgenda(String title) throws Exception {
     HttpResponse<String> response =
         post(
@@ -267,6 +290,15 @@ class VotingApiIntegrationTest {
     return objectMapper.readTree(response.body()).get("code").asText();
   }
 
+  private void assertProblem(HttpResponse<String> response, int status, String code)
+      throws Exception {
+    assertThat(response.statusCode()).isEqualTo(status);
+    assertThat(response.headers().firstValue("Content-Type"))
+        .hasValueSatisfying(
+            contentType -> assertThat(contentType).startsWith("application/problem+json"));
+    assertThat(errorCode(response)).isEqualTo(code);
+  }
+
   private HttpResponse<String> post(String path, String json) throws Exception {
     HttpRequest request =
         HttpRequest.newBuilder(uri(path))
@@ -280,6 +312,10 @@ class VotingApiIntegrationTest {
   private HttpResponse<String> getApi(String path) throws Exception {
     HttpRequest request =
         HttpRequest.newBuilder(uri(path)).timeout(Duration.ofSeconds(10)).GET().build();
+    return send(request);
+  }
+
+  private HttpResponse<String> send(HttpRequest request) throws Exception {
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
   }
 

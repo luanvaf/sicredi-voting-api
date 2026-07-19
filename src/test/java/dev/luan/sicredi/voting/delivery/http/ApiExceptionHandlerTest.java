@@ -18,17 +18,25 @@ import dev.luan.sicredi.voting.service.error.VotingSessionClosedException;
 import dev.luan.sicredi.voting.service.error.VotingSessionNotFoundException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.core.MethodParameter;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 class ApiExceptionHandlerTest {
 
@@ -82,6 +90,68 @@ class ApiExceptionHandlerTest {
   }
 
   @Test
+  void shouldMapMissingResources() {
+    ProblemDetail problem =
+        handler.handleMissingResource(
+            new NoResourceFoundException(HttpMethod.GET, "missing", "No static resource missing"));
+
+    assertProtocolProblem(
+        problem,
+        HttpStatus.NOT_FOUND,
+        "Resource not found",
+        "RESOURCE_NOT_FOUND",
+        "The requested resource was not found");
+  }
+
+  @Test
+  void shouldMapUnsupportedMethodsAndPreserveAllowHeader() {
+    ResponseEntity<ProblemDetail> response =
+        handler.handleMethodNotAllowed(
+            new HttpRequestMethodNotSupportedException("GET", List.of("POST")));
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+    assertThat(response.getHeaders().getAllow()).isEqualTo(Set.of(HttpMethod.POST));
+    assertProtocolProblem(
+        response.getBody(),
+        HttpStatus.METHOD_NOT_ALLOWED,
+        "Method not allowed",
+        "METHOD_NOT_ALLOWED",
+        "The HTTP method is not supported for this resource");
+  }
+
+  @Test
+  void shouldMapUnsupportedRequestMediaAndPreserveAcceptHeader() {
+    ResponseEntity<ProblemDetail> response =
+        handler.handleUnsupportedMediaType(
+            new HttpMediaTypeNotSupportedException(
+                MediaType.TEXT_PLAIN, List.of(MediaType.APPLICATION_JSON), HttpMethod.POST));
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+    assertThat(response.getHeaders().getAccept()).containsExactly(MediaType.APPLICATION_JSON);
+    assertProtocolProblem(
+        response.getBody(),
+        HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+        "Unsupported media type",
+        "UNSUPPORTED_MEDIA_TYPE",
+        "The request media type is not supported");
+  }
+
+  @Test
+  void shouldMapUnavailableResponseMedia() {
+    ResponseEntity<ProblemDetail> response =
+        handler.handleNotAcceptable(
+            new HttpMediaTypeNotAcceptableException(List.of(MediaType.APPLICATION_JSON)));
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_ACCEPTABLE);
+    assertProtocolProblem(
+        response.getBody(),
+        HttpStatus.NOT_ACCEPTABLE,
+        "Representation not acceptable",
+        "NOT_ACCEPTABLE",
+        "The requested response media type is not available");
+  }
+
+  @Test
   void shouldHideUnexpectedFailureDetails() {
     ProblemDetail problem =
         handler.handleUnexpectedError(new IllegalStateException("sensitive internal detail"));
@@ -89,6 +159,15 @@ class ApiExceptionHandlerTest {
     assertThat(problem.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
     assertThat(problem.getDetail()).isEqualTo("An unexpected error occurred");
     assertThat(problem.getProperties()).containsEntry("code", "INTERNAL_ERROR");
+  }
+
+  private static void assertProtocolProblem(
+      ProblemDetail problem, HttpStatus status, String title, String code, String detail) {
+    assertThat(problem).isNotNull();
+    assertThat(problem.getStatus()).isEqualTo(status.value());
+    assertThat(problem.getTitle()).isEqualTo(title);
+    assertThat(problem.getDetail()).isEqualTo(detail);
+    assertThat(problem.getProperties()).containsEntry("code", code);
   }
 
   private static Stream<Arguments> applicationErrors() {
