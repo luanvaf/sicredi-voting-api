@@ -38,7 +38,9 @@ export const options = {
   },
   thresholds: {
     checks: ["rate>0.99"],
+    dropped_iterations: ["count<1"],
     http_req_failed: ["rate<0.01"],
+    iterations: [`count>=${TOTAL_VOTES}`],
     "http_req_duration{endpoint:vote}": ["p(95)<1000", "p(99)<2000"],
     vote_duration: ["p(95)<1000", "p(99)<2000"],
     vote_failures: ["rate<0.01"],

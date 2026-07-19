@@ -3,7 +3,10 @@
 The k6 scenario in [`k6/voting-load-test.js`](k6/voting-load-test.js) creates a
 new agenda, opens a 24-hour voting session, and submits an exact number of
 unique votes. The standard run submits 100,000 votes with 200 virtual users.
-Each run leaves its agenda, session, and votes in the configured database.
+The test fails if `maxDuration` expires before every configured iteration is
+completed, so a truncated run cannot be reported as a successful 100,000-vote
+execution. Each run leaves its agenda, session, and votes in the configured
+database.
 
 ## Safety
 
@@ -32,9 +35,8 @@ reuse a performance-test environment as a functional-test environment.
     `ELIGIBILITY_MODE=always`. This setting changes CPF selection in k6; it
     does not replace or bypass the API's eligibility call.
 
-The API's default external eligibility URL is not suitable for this test.
-Configure `ELIGIBILITY_BASE_URL` before starting the API. For example, when the
-API and Worker both run on the host:
+The API requires `ELIGIBILITY_BASE_URL` at startup. For example, when the API
+and Worker both run on the host:
 
 ```powershell
 $env:ELIGIBILITY_BASE_URL = "http://localhost:8787"
