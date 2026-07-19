@@ -1,6 +1,9 @@
 spring:
   application:
     name: sicredi-voting-api
+  jackson:
+    deserialization:
+      accept-float-as-int: false
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/voting}
     username: ${DATABASE_USERNAME:voting}

@@ -264,6 +264,16 @@ class VotingApiIntegrationTest {
     assertProblem(send(unacceptableMediaType), 406, "NOT_ACCEPTABLE");
   }
 
+  @Test
+  void shouldRejectFractionalSessionDurations() throws Exception {
+    UUID agendaId = createAgenda("Fractional duration");
+
+    HttpResponse<String> response =
+        post("/api/v1/agendas/" + agendaId + "/voting-sessions", "{\"durationSeconds\":2.9}");
+
+    assertProblem(response, 400, "INVALID_REQUEST");
+  }
+
   private UUID createAgenda(String title) throws Exception {
     HttpResponse<String> response =
         post(
