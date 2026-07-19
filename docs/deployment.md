@@ -130,9 +130,9 @@ for Neon's pooled endpoint.
 ### 3. Create the CloudAMQP broker
 
 1. Create a CloudAMQP instance in the closest available region.
-2. For a no-cost evaluation, select the current free shared plan. At the time of
-   writing this is the Loyal Lemming LavinMQ plan. LavinMQ implements AMQP
-   0-9-1, which is the protocol used by Spring AMQP.
+2. For a no-cost evaluation, select the current Little Lemur shared RabbitMQ
+   plan. Provider names and quotas can change, so confirm that the selected plan
+   is still free before creating the instance.
 3. In the instance overview, copy the complete AMQP URL, including its virtual
    host and TLS scheme.
 4. Store that value as `RABBITMQ_URL` in Render.
