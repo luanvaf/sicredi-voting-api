@@ -23,6 +23,8 @@ services:
         sync: false
       - key: ELIGIBILITY_BASE_URL
         sync: false
+      - key: DATABASE_CONNECTION_TIMEOUT_MILLIS
+        value: "5000"
       - key: DATABASE_MAXIMUM_POOL_SIZE
         value: "5"
       - key: DATABASE_MINIMUM_IDLE

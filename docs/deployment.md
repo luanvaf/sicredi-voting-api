@@ -123,9 +123,10 @@ DATABASE_PASSWORD=<password>
 
 Do not include the username or password in `DATABASE_URL`. The Blueprint limits
 HikariCP to five connections with one minimum idle connection, which is a
-conservative starting point for the free database. If migrations are later
-moved to a separate deployment step, the runtime datasource can be evaluated
-for Neon's pooled endpoint.
+conservative starting point for the free database. Connection acquisition is
+bounded to five seconds so requests fail promptly when the database is
+unavailable. If migrations are later moved to a separate deployment step, the
+runtime datasource can be evaluated for Neon's pooled endpoint.
 
 ### 3. Create the CloudAMQP broker
 
