@@ -61,12 +61,14 @@ class VotingUseCaseConfiguration {
 
   @Bean
   CastVote castVote(
+      AgendaRepository agendaRepository,
       VotingSessionRepository votingSessionRepository,
       VoteRepository voteRepository,
       AssociateEligibilityGateway associateEligibilityGateway,
       TransactionExecutor transactionExecutor,
       Clock votingClock) {
     return new CastVoteService(
+        agendaRepository,
         votingSessionRepository,
         voteRepository,
         associateEligibilityGateway,

@@ -7,17 +7,20 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import dev.luan.sicredi.voting.domainmodel.Agenda;
 import dev.luan.sicredi.voting.domainmodel.AgendaId;
 import dev.luan.sicredi.voting.domainmodel.AssociateCpf;
 import dev.luan.sicredi.voting.domainmodel.AssociateEligibility;
 import dev.luan.sicredi.voting.domainmodel.Vote;
 import dev.luan.sicredi.voting.domainmodel.VoteChoice;
 import dev.luan.sicredi.voting.domainmodel.VotingSession;
+import dev.luan.sicredi.voting.service.error.AgendaNotFoundException;
 import dev.luan.sicredi.voting.service.error.AssociateAlreadyVotedException;
 import dev.luan.sicredi.voting.service.error.AssociateNotEligibleException;
 import dev.luan.sicredi.voting.service.error.VotingSessionClosedException;
 import dev.luan.sicredi.voting.service.error.VotingSessionNotFoundException;
 import dev.luan.sicredi.voting.service.port.in.CastVote;
+import dev.luan.sicredi.voting.service.port.out.AgendaRepository;
 import dev.luan.sicredi.voting.service.port.out.AssociateEligibilityGateway;
 import dev.luan.sicredi.voting.service.port.out.DuplicateVoteException;
 import dev.luan.sicredi.voting.service.port.out.VoteRepository;
@@ -38,6 +41,7 @@ class CastVoteServiceTest {
   private final AssociateCpf associateCpf = new AssociateCpf("19839091069");
   private final VotingSession votingSession =
       VotingSession.open(agendaId, OPENED_AT, Duration.ofMinutes(1));
+  private final AgendaRepository agendaRepository = mock(AgendaRepository.class);
   private final VotingSessionRepository votingSessionRepository =
       mock(VotingSessionRepository.class);
   private final VoteRepository voteRepository = mock(VoteRepository.class);
@@ -46,6 +50,9 @@ class CastVoteServiceTest {
 
   @BeforeEach
   void configureRepositories() {
+    when(agendaRepository.findById(agendaId))
+        .thenReturn(
+            Optional.of(new Agenda(agendaId, "Annual budget", null, OPENED_AT.minusSeconds(1))));
     when(votingSessionRepository.findByAgendaId(agendaId)).thenReturn(Optional.of(votingSession));
     when(votingSessionRepository.acquireForVote(agendaId)).thenReturn(Optional.of(votingSession));
     when(eligibilityGateway.check(associateCpf)).thenReturn(AssociateEligibility.ELIGIBLE);
@@ -72,6 +79,18 @@ class CastVoteServiceTest {
     assertThatThrownBy(
             () -> service.execute(new CastVote.Command(agendaId, associateCpf, VoteChoice.YES)))
         .isInstanceOf(VotingSessionNotFoundException.class);
+    verifyNoInteractions(eligibilityGateway);
+  }
+
+  @Test
+  void shouldRejectAnUnknownAgendaBeforeCheckingEligibility() {
+    when(votingSessionRepository.findByAgendaId(agendaId)).thenReturn(Optional.empty());
+    when(agendaRepository.findById(agendaId)).thenReturn(Optional.empty());
+    CastVoteService service = serviceWithFixedClock(OPENED_AT.plusSeconds(30));
+
+    assertThatThrownBy(
+            () -> service.execute(new CastVote.Command(agendaId, associateCpf, VoteChoice.YES)))
+        .isInstanceOf(AgendaNotFoundException.class);
     verifyNoInteractions(eligibilityGateway);
   }
 
@@ -123,6 +142,7 @@ class CastVoteServiceTest {
 
   private CastVoteService serviceWithClock(Clock clock) {
     return new CastVoteService(
+        agendaRepository,
         votingSessionRepository,
         voteRepository,
         eligibilityGateway,

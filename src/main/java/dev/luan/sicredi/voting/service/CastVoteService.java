@@ -5,11 +5,13 @@ import dev.luan.sicredi.voting.domainmodel.Vote;
 import dev.luan.sicredi.voting.domainmodel.VoteId;
 import dev.luan.sicredi.voting.domainmodel.VotingSession;
 import dev.luan.sicredi.voting.engine.VotingSessionPolicy;
+import dev.luan.sicredi.voting.service.error.AgendaNotFoundException;
 import dev.luan.sicredi.voting.service.error.AssociateAlreadyVotedException;
 import dev.luan.sicredi.voting.service.error.AssociateNotEligibleException;
 import dev.luan.sicredi.voting.service.error.VotingSessionClosedException;
 import dev.luan.sicredi.voting.service.error.VotingSessionNotFoundException;
 import dev.luan.sicredi.voting.service.port.in.CastVote;
+import dev.luan.sicredi.voting.service.port.out.AgendaRepository;
 import dev.luan.sicredi.voting.service.port.out.AssociateEligibilityGateway;
 import dev.luan.sicredi.voting.service.port.out.DuplicateVoteException;
 import dev.luan.sicredi.voting.service.port.out.TransactionExecutor;
@@ -21,6 +23,7 @@ import java.util.Objects;
 
 public final class CastVoteService implements CastVote {
 
+  private final AgendaRepository agendaRepository;
   private final VotingSessionRepository votingSessionRepository;
   private final VoteRepository voteRepository;
   private final AssociateEligibilityGateway associateEligibilityGateway;
@@ -28,11 +31,14 @@ public final class CastVoteService implements CastVote {
   private final Clock clock;
 
   public CastVoteService(
+      AgendaRepository agendaRepository,
       VotingSessionRepository votingSessionRepository,
       VoteRepository voteRepository,
       AssociateEligibilityGateway associateEligibilityGateway,
       TransactionExecutor transactionExecutor,
       Clock clock) {
+    this.agendaRepository =
+        Objects.requireNonNull(agendaRepository, "Agenda repository must not be null");
     this.votingSessionRepository =
         Objects.requireNonNull(
             votingSessionRepository, "Voting session repository must not be null");
@@ -67,8 +73,15 @@ public final class CastVoteService implements CastVote {
     VotingSession votingSession =
         votingSessionRepository
             .findByAgendaId(command.agendaId())
-            .orElseThrow(() -> new VotingSessionNotFoundException(command.agendaId()));
+            .orElseGet(() -> missingVotingSession(command));
     requireOpen(votingSession, command, Instant.now(clock));
+  }
+
+  private VotingSession missingVotingSession(Command command) {
+    if (agendaRepository.findById(command.agendaId()).isEmpty()) {
+      throw new AgendaNotFoundException(command.agendaId());
+    }
+    throw new VotingSessionNotFoundException(command.agendaId());
   }
 
   private Vote persistVote(Command command) {
