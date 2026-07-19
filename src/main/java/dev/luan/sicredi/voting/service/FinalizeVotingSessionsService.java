@@ -1,11 +1,13 @@
 package dev.luan.sicredi.voting.service;
 
+import dev.luan.sicredi.voting.domainmodel.AgendaId;
 import dev.luan.sicredi.voting.domainmodel.VoteTally;
 import dev.luan.sicredi.voting.domainmodel.VotingResult;
 import dev.luan.sicredi.voting.domainmodel.VotingResultFinalizedEvent;
 import dev.luan.sicredi.voting.domainmodel.VotingSession;
 import dev.luan.sicredi.voting.engine.VotingResultCalculator;
 import dev.luan.sicredi.voting.service.port.in.FinalizeExpiredVotingSessions;
+import dev.luan.sicredi.voting.service.port.in.FinalizeVotingSession;
 import dev.luan.sicredi.voting.service.port.out.TransactionExecutor;
 import dev.luan.sicredi.voting.service.port.out.VoteRepository;
 import dev.luan.sicredi.voting.service.port.out.VotingResultOutbox;
@@ -15,8 +17,10 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
-public final class FinalizeExpiredVotingSessionsService implements FinalizeExpiredVotingSessions {
+public final class FinalizeVotingSessionsService
+    implements FinalizeExpiredVotingSessions, FinalizeVotingSession {
 
   private final VotingSessionRepository votingSessionRepository;
   private final VoteRepository voteRepository;
@@ -25,7 +29,7 @@ public final class FinalizeExpiredVotingSessionsService implements FinalizeExpir
   private final TransactionExecutor transactionExecutor;
   private final Clock clock;
 
-  public FinalizeExpiredVotingSessionsService(
+  public FinalizeVotingSessionsService(
       VotingSessionRepository votingSessionRepository,
       VoteRepository voteRepository,
       VotingResultRepository votingResultRepository,
@@ -55,6 +59,13 @@ public final class FinalizeExpiredVotingSessionsService implements FinalizeExpir
     return transactionExecutor.required(() -> finalizeBatch(closingThreshold, batchSize));
   }
 
+  @Override
+  public Optional<VotingResult> execute(AgendaId agendaId) {
+    Objects.requireNonNull(agendaId, "Agenda ID must not be null");
+    Instant closingThreshold = Instant.now(clock);
+    return transactionExecutor.required(() -> finalizeByAgendaId(agendaId, closingThreshold));
+  }
+
   private int finalizeBatch(Instant closingThreshold, int batchSize) {
     List<VotingSession> expiredSessions =
         votingSessionRepository.acquireExpiredForClosure(closingThreshold, batchSize);
@@ -62,7 +73,22 @@ public final class FinalizeExpiredVotingSessionsService implements FinalizeExpir
     return expiredSessions.size();
   }
 
-  private void finalizeSession(VotingSession session, Instant finalizedAt) {
+  private Optional<VotingResult> finalizeByAgendaId(AgendaId agendaId, Instant closingThreshold) {
+    Optional<VotingSession> session = votingSessionRepository.acquireForClosure(agendaId);
+    if (session.isEmpty()) {
+      return Optional.empty();
+    }
+    VotingSession lockedSession = session.orElseThrow();
+    if (!lockedSession.isExpiredAt(closingThreshold)) {
+      return Optional.empty();
+    }
+    if (lockedSession.isFinalized()) {
+      return votingResultRepository.findByVotingSessionId(lockedSession.id());
+    }
+    return Optional.of(finalizeSession(lockedSession, closingThreshold));
+  }
+
+  private VotingResult finalizeSession(VotingSession session, Instant finalizedAt) {
     VoteTally tally = voteRepository.tally(session.id());
     VotingResult result =
         VotingResultCalculator.calculate(
@@ -71,5 +97,6 @@ public final class FinalizeExpiredVotingSessionsService implements FinalizeExpir
     votingResultRepository.save(result);
     votingResultOutbox.append(VotingResultFinalizedEvent.from(result));
     votingSessionRepository.save(session.finalizeAt(finalizedAt));
+    return result;
   }
 }

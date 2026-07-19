@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import dev.luan.sicredi.voting.domainmodel.AgendaId;
@@ -22,10 +23,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-class FinalizeExpiredVotingSessionsServiceTest {
+class FinalizeVotingSessionsServiceTest {
 
   private static final Instant NOW = Instant.parse("2026-07-19T12:00:00Z");
 
@@ -34,8 +36,8 @@ class FinalizeExpiredVotingSessionsServiceTest {
   private final VoteRepository voteRepository = mock(VoteRepository.class);
   private final VotingResultRepository votingResultRepository = mock(VotingResultRepository.class);
   private final VotingResultOutbox votingResultOutbox = mock(VotingResultOutbox.class);
-  private final FinalizeExpiredVotingSessionsService service =
-      new FinalizeExpiredVotingSessionsService(
+  private final FinalizeVotingSessionsService service =
+      new FinalizeVotingSessionsService(
           votingSessionRepository,
           voteRepository,
           votingResultRepository,
@@ -87,6 +89,46 @@ class FinalizeExpiredVotingSessionsServiceTest {
     ArgumentCaptor<VotingSession> sessionCaptor = ArgumentCaptor.forClass(VotingSession.class);
     verify(votingSessionRepository).save(sessionCaptor.capture());
     assertThat(sessionCaptor.getValue().finalizedAt()).isEqualTo(NOW);
+  }
+
+  @Test
+  void shouldFinalizeAnExpiredSessionByAgendaId() {
+    VotingSession session =
+        new VotingSession(
+            VotingSessionId.newId(),
+            AgendaId.newId(),
+            NOW.minusSeconds(120),
+            NOW.minusSeconds(60),
+            null);
+    when(votingSessionRepository.acquireForClosure(session.agendaId()))
+        .thenReturn(Optional.of(session));
+    when(voteRepository.tally(session.id())).thenReturn(new VoteTally(1, 0));
+    when(votingResultRepository.save(any(VotingResult.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(votingSessionRepository.save(any(VotingSession.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    Optional<VotingResult> result = service.execute(session.agendaId());
+
+    assertThat(result).isPresent();
+    assertThat(result.orElseThrow().outcome()).isEqualTo(VotingOutcome.APPROVED);
+    verify(votingResultOutbox).append(any(VotingResultFinalizedEvent.class));
+  }
+
+  @Test
+  void shouldNotFinalizeAnOpenSessionOnDemand() {
+    VotingSession session =
+        new VotingSession(
+            VotingSessionId.newId(),
+            AgendaId.newId(),
+            NOW.minusSeconds(30),
+            NOW.plusSeconds(30),
+            null);
+    when(votingSessionRepository.acquireForClosure(session.agendaId()))
+        .thenReturn(Optional.of(session));
+
+    assertThat(service.execute(session.agendaId())).isEmpty();
+    verifyNoInteractions(voteRepository, votingResultRepository, votingResultOutbox);
   }
 
   @Test

@@ -2,7 +2,6 @@ package dev.luan.sicredi.voting.integration.persistence;
 
 import dev.luan.sicredi.voting.domainmodel.AgendaId;
 import dev.luan.sicredi.voting.domainmodel.VotingSession;
-import dev.luan.sicredi.voting.domainmodel.VotingSessionId;
 import dev.luan.sicredi.voting.service.error.PersistenceUnavailableException;
 import dev.luan.sicredi.voting.service.port.out.DuplicateVotingSessionException;
 import dev.luan.sicredi.voting.service.port.out.VotingSessionRepository;
@@ -80,13 +79,14 @@ public class PostgresVotingSessionRepository implements VotingSessionRepository 
   }
 
   @Override
-  public Optional<VotingSession> acquireForClosure(VotingSessionId votingSessionId) {
+  public Optional<VotingSession> acquireForClosure(AgendaId agendaId) {
     try {
-      return Optional.ofNullable(
-              entityManager.find(
-                  VotingSessionJpaEntity.class,
-                  votingSessionId.value(),
-                  LockModeType.PESSIMISTIC_WRITE))
+      return entityManager
+          .createQuery(FIND_BY_AGENDA_ID, VotingSessionJpaEntity.class)
+          .setParameter("agendaId", agendaId.value())
+          .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+          .getResultStream()
+          .findFirst()
           .map(VotingSessionJpaEntity::toDomain);
     } catch (PersistenceException exception) {
       throw new PersistenceUnavailableException(exception);

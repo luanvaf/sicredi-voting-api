@@ -102,7 +102,7 @@ All application endpoints are versioned.
 | `POST` | `/api/v1/agendas` | `201` | Create an agenda |
 | `POST` | `/api/v1/agendas/{agendaId}/voting-sessions` | `201` | Open the agenda's only session |
 | `POST` | `/api/v1/agendas/{agendaId}/votes` | `201` | Cast an eligible associate's vote |
-| `GET` | `/api/v1/agendas/{agendaId}/result` | `200` | Read the finalized result |
+| `GET` | `/api/v1/agendas/{agendaId}/result` | `200` | Finalize an expired session and read its result |
 
 Create an agenda:
 

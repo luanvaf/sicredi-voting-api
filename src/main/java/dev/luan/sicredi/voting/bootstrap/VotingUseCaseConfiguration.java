@@ -3,12 +3,12 @@ package dev.luan.sicredi.voting.bootstrap;
 import dev.luan.sicredi.voting.engine.VotingSessionDurationPolicy;
 import dev.luan.sicredi.voting.service.CastVoteService;
 import dev.luan.sicredi.voting.service.CreateAgendaService;
-import dev.luan.sicredi.voting.service.FinalizeExpiredVotingSessionsService;
+import dev.luan.sicredi.voting.service.FinalizeVotingSessionsService;
 import dev.luan.sicredi.voting.service.GetVotingResultService;
 import dev.luan.sicredi.voting.service.OpenVotingSessionService;
 import dev.luan.sicredi.voting.service.port.in.CastVote;
 import dev.luan.sicredi.voting.service.port.in.CreateAgenda;
-import dev.luan.sicredi.voting.service.port.in.FinalizeExpiredVotingSessions;
+import dev.luan.sicredi.voting.service.port.in.FinalizeVotingSession;
 import dev.luan.sicredi.voting.service.port.in.GetVotingResult;
 import dev.luan.sicredi.voting.service.port.in.OpenVotingSession;
 import dev.luan.sicredi.voting.service.port.out.AgendaRepository;
@@ -78,19 +78,22 @@ class VotingUseCaseConfiguration {
 
   @Bean
   GetVotingResult getVotingResult(
-      AgendaRepository agendaRepository, VotingResultRepository votingResultRepository) {
-    return new GetVotingResultService(agendaRepository, votingResultRepository);
+      AgendaRepository agendaRepository,
+      VotingResultRepository votingResultRepository,
+      FinalizeVotingSession finalizeVotingSession) {
+    return new GetVotingResultService(
+        agendaRepository, votingResultRepository, finalizeVotingSession);
   }
 
   @Bean
-  FinalizeExpiredVotingSessions finalizeExpiredVotingSessions(
+  FinalizeVotingSessionsService finalizeVotingSessions(
       VotingSessionRepository votingSessionRepository,
       VoteRepository voteRepository,
       VotingResultRepository votingResultRepository,
       VotingResultOutbox votingResultOutbox,
       TransactionExecutor transactionExecutor,
       Clock votingClock) {
-    return new FinalizeExpiredVotingSessionsService(
+    return new FinalizeVotingSessionsService(
         votingSessionRepository,
         voteRepository,
         votingResultRepository,
