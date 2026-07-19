@@ -1,0 +1,61 @@
+spring:
+  application:
+    name: sicredi-voting-api
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/voting}
+    username: ${DATABASE_USERNAME:voting}
+    password: ${DATABASE_PASSWORD:voting}
+    hikari:
+      maximum-pool-size: ${DATABASE_MAXIMUM_POOL_SIZE:20}
+      minimum-idle: ${DATABASE_MINIMUM_IDLE:2}
+  flyway:
+    enabled: true
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  rabbitmq:
+    addresses: ${RABBITMQ_URL:amqp://guest:guest@localhost:5672}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+app:
+  voting:
+    default-session-duration: PT1M
+    maximum-session-duration: PT24H
+    closure-poll-delay: PT1S
+  eligibility:
+    base-url: ${ELIGIBILITY_BASE_URL:https://user-info.herokuapp.com}
+    connect-timeout: PT2S
+    read-timeout: PT3S
+  messaging:
+    result-exchange: voting.results
+    result-routing-key: voting.session.closed
+    result-queue: voting.results.platform
