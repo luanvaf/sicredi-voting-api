@@ -229,6 +229,18 @@ class VotingApiIntegrationTest {
     }
   }
 
+  @Test
+  void shouldExposeTheVersionedOpenApiContract() throws Exception {
+    HttpResponse<String> response = getApi("/v3/api-docs");
+
+    assertThat(response.statusCode()).isEqualTo(200);
+    JsonNode paths = objectMapper.readTree(response.body()).get("paths");
+    assertThat(paths.has("/api/v1/agendas")).isTrue();
+    assertThat(paths.has("/api/v1/agendas/{agendaId}/voting-sessions")).isTrue();
+    assertThat(paths.has("/api/v1/agendas/{agendaId}/votes")).isTrue();
+    assertThat(paths.has("/api/v1/agendas/{agendaId}/result")).isTrue();
+  }
+
   private UUID createAgenda(String title) throws Exception {
     HttpResponse<String> response =
         post(
