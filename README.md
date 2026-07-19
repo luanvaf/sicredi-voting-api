@@ -37,20 +37,40 @@ integration remains reproducible without weakening the HTTP boundary.
 - JUnit 6, AssertJ, Mockito, ArchUnit, WireMock, and Testcontainers
 - JaCoCo, Spotless, Docker, GitHub Actions, and k6
 
-## Run with Docker Compose
+## Quick Start with Docker Compose
+
+Docker Compose is the recommended way to run the complete application locally.
 
 Requirements:
 
 - Docker Engine or Docker Desktop
 - Docker Compose v2
 
-Create the ignored local environment file and set unique passwords:
+Create the ignored local environment file.
+
+On Windows PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Then start the complete local topology:
+On Linux or macOS:
+
+```shell
+cp .env.example .env
+```
+
+Edit `.env` and set non-empty local values for both password fields:
+
+```dotenv
+POSTGRES_PASSWORD=change-me-postgres
+RABBITMQ_PASSWORD=change-me-rabbitmq
+```
+
+Use unique values, keep the file local, and never commit it. Docker Compose
+rejects empty passwords deliberately.
+
+Build and start the complete local topology:
 
 ```shell
 docker compose up --build --detach
@@ -58,7 +78,16 @@ docker compose ps
 ```
 
 The stack contains the API, PostgreSQL, RabbitMQ, and an HTTP eligibility
-service using the same contract as the hosted Worker.
+service using the same contract as the hosted Worker. The first build downloads
+container images and Maven dependencies, so it can take several minutes.
+Compose starts the API only after its dependencies are healthy.
+
+Run `docker compose ps` again until all four services report `healthy`. If the
+API does not become healthy, follow its startup logs:
+
+```shell
+docker compose logs --follow app
+```
 
 Open:
 
@@ -67,30 +96,90 @@ Open:
 - Health: <http://localhost:8080/actuator/health>
 - RabbitMQ management: <http://localhost:15672>
 
+RabbitMQ management uses `RABBITMQ_USERNAME` and `RABBITMQ_PASSWORD` from the
+local `.env` file.
+
 Stop the stack without deleting its data:
 
 ```shell
 docker compose down
 ```
 
+To delete the local PostgreSQL and RabbitMQ data as well:
+
+```shell
+docker compose down --volumes
+```
+
+The command with `--volumes` is destructive and should only be used when the
+local data can be discarded.
+
+### Verify the API in Swagger
+
+After every service is healthy:
+
+1. Open <http://localhost:8080/swagger-ui.html>.
+2. Create an agenda with `POST /api/v1/agendas`, using a title and optional
+   description, then copy its `id`.
+3. Open its session with
+   `POST /api/v1/agendas/{agendaId}/voting-sessions` and
+   `{"durationSeconds": 5}`.
+4. Cast a vote with `POST /api/v1/agendas/{agendaId}/votes`, using the valid
+   eligible payload `{"associateCpf": "93541134780", "choice": "YES"}`.
+5. Wait for the configured session duration and read the finalized result with
+   `GET /api/v1/agendas/{agendaId}/result`.
+
 ## Run from Maven
 
-Start PostgreSQL, RabbitMQ, and an eligibility provider, then configure every
-connection variable documented in `.env.example`. `ELIGIBILITY_BASE_URL` is
-required deliberately so the application fails during startup instead of
-silently using the discontinued challenge endpoint.
+This alternative requires Java 21 and a local Node.js installation with `npx`.
+The commands below assume the default ports and usernames from `.env`.
 
-On Windows:
+First create `.env` as described in the Docker Compose quick start and run
+PostgreSQL and RabbitMQ:
+
+```shell
+docker compose up --detach postgres rabbitmq
+```
+
+In a separate terminal, start the deterministic eligibility provider:
+
+```shell
+cd infra/eligibility-worker
+npx wrangler dev
+```
+
+Then export the application connection variables. Spring Boot does not load the
+root `.env` file automatically when Maven starts the application, so replace
+the two password placeholders with the values from that file.
+
+On Windows PowerShell:
 
 ```powershell
+$env:DATABASE_URL = "jdbc:postgresql://localhost:5432/voting"
+$env:DATABASE_USERNAME = "voting"
+$env:DATABASE_PASSWORD = "<POSTGRES_PASSWORD from .env>"
+$env:SPRING_RABBITMQ_ADDRESSES = "localhost:5672"
+$env:SPRING_RABBITMQ_USERNAME = "voting"
+$env:SPRING_RABBITMQ_PASSWORD = "<RABBITMQ_PASSWORD from .env>"
+$env:ELIGIBILITY_BASE_URL = "http://localhost:8787"
 .\mvnw.cmd spring-boot:run
 ```
 
 On Linux or macOS:
 
 ```shell
+export DATABASE_URL="jdbc:postgresql://localhost:5432/voting"
+export DATABASE_USERNAME="voting"
+export DATABASE_PASSWORD="<POSTGRES_PASSWORD from .env>"
+export SPRING_RABBITMQ_ADDRESSES="localhost:5672"
+export SPRING_RABBITMQ_USERNAME="voting"
+export SPRING_RABBITMQ_PASSWORD="<RABBITMQ_PASSWORD from .env>"
+export ELIGIBILITY_BASE_URL="http://localhost:8787"
 ./mvnw spring-boot:run
 ```
+
+`ELIGIBILITY_BASE_URL` is required deliberately so startup fails instead of
+silently using the discontinued challenge endpoint.
 
 Flyway validates and migrates the database at startup. Hibernate only validates
 the resulting schema.
