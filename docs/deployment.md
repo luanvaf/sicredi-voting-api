@@ -192,4 +192,3 @@ old credentials in Git.
 - [Neon connection pooling and migration guidance](https://neon.com/docs/connect/connection-pooling)
 - [CloudAMQP getting started](https://www.cloudamqp.com/docs/index.html)
 - [CloudAMQP plans](https://www.cloudamqp.com/plans.html)
-- [LavinMQ AMQP 0-9-1](https://lavinmq.com/documentation/amqp-the-protocol)
