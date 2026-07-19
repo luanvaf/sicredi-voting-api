@@ -1,0 +1,29 @@
+previews:
+  generation: "off"
+
+services:
+  - type: web
+    name: sicredi-voting-api
+    runtime: docker
+    plan: free
+    region: virginia
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /actuator/health/readiness
+    maxShutdownDelaySeconds: 30
+    autoDeployTrigger: commit
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_USERNAME
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: RABBITMQ_URL
+        sync: false
+      - key: ELIGIBILITY_BASE_URL
+        sync: false
+      - key: DATABASE_MAXIMUM_POOL_SIZE
+        value: "5"
+      - key: DATABASE_MINIMUM_IDLE
+        value: "1"
