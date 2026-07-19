@@ -11,6 +11,10 @@ export default {
       });
     }
 
+    if (url.pathname === "/health") {
+      return Response.json({ status: "UP" });
+    }
+
     const match = USER_PATH.exec(url.pathname);
     if (!match) {
       return notFound();
