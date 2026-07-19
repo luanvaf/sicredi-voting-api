@@ -25,7 +25,6 @@ import java.util.concurrent.Executors;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -34,7 +33,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
@@ -47,7 +45,6 @@ import tools.jackson.databind.ObjectMapper;
 
 @Testcontainers
 @ExtendWith(OutputCaptureExtension.class)
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @SpringBootTest(
     classes = VotingApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -95,8 +92,6 @@ class VotingApiIntegrationTest {
 
   @Autowired private RabbitTemplate rabbitTemplate;
 
-  @Autowired private ConfigurableApplicationContext applicationContext;
-
   private HttpClient httpClient;
 
   @BeforeEach
@@ -112,8 +107,7 @@ class VotingApiIntegrationTest {
   }
 
   @AfterAll
-  void stopApplicationAndEligibilityProvider() {
-    applicationContext.close();
+  static void stopEligibilityProvider() {
     ELIGIBILITY_PROVIDER.stop();
   }
 
