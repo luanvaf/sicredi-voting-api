@@ -11,7 +11,7 @@ services:
     dockerContext: .
     healthCheckPath: /actuator/health/readiness
     maxShutdownDelaySeconds: 30
-    autoDeployTrigger: commit
+    autoDeployTrigger: checksPass
     envVars:
       - key: DATABASE_URL
         sync: false
