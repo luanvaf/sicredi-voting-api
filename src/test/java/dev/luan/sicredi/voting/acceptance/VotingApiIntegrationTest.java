@@ -15,6 +15,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -33,6 +34,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
@@ -49,7 +51,7 @@ import tools.jackson.databind.ObjectMapper;
     classes = VotingApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = {
-      "app.voting.closure-poll-delay=PT0.1S",
+      "app.voting.closure-poll-delay=PT1H",
       "app.messaging.relay-poll-delay=PT0.1S",
       "app.messaging.confirm-timeout=PT3S",
       "app.messaging.claim-lease=PT10S"
@@ -91,6 +93,8 @@ class VotingApiIntegrationTest {
   @Autowired private ObjectMapper objectMapper;
 
   @Autowired private RabbitTemplate rabbitTemplate;
+
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   private HttpClient httpClient;
 
@@ -141,11 +145,7 @@ class VotingApiIntegrationTest {
     assertThat(result.get("totalVotes").asLong()).isOne();
     assertThat(result.get("outcome").asText()).isEqualTo("APPROVED");
 
-    Message publishedMessage =
-        await()
-            .atMost(Duration.ofSeconds(10))
-            .pollInterval(Duration.ofMillis(200))
-            .until(() -> rabbitTemplate.receive(RESULT_QUEUE, 100), java.util.Objects::nonNull);
+    Message publishedMessage = receiveResultFor(agendaId);
     String eventPayload = new String(publishedMessage.getBody(), StandardCharsets.UTF_8);
     JsonNode event = objectMapper.readTree(eventPayload);
     assertThat(event.get("agendaId").asText()).isEqualTo(agendaId.toString());
@@ -193,6 +193,42 @@ class VotingApiIntegrationTest {
     assertThat(statuses).filteredOn(status -> status == 409).hasSize(19);
   }
 
+  @Test
+  void shouldIncludeAVoteThatOverlapsOnDemandFinalization() throws Exception {
+    UUID agendaId = createAgenda("Closing boundary");
+    HttpResponse<String> sessionResponse = openSession(agendaId, 3);
+    assertThat(sessionResponse.statusCode()).isEqualTo(201);
+    Instant closesAt =
+        Instant.parse(objectMapper.readTree(sessionResponse.body()).get("closesAt").asText());
+
+    installDelayedVoteTrigger();
+    try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+      CompletableFuture<HttpResponse<String>> voteResponse =
+          CompletableFuture.supplyAsync(
+              () -> {
+                try {
+                  return castVote(agendaId, ELIGIBLE_CPF, "YES");
+                } catch (Exception exception) {
+                  throw new IllegalStateException(exception);
+                }
+              },
+              executor);
+
+      await().atMost(Duration.ofSeconds(5)).until(this::voteInsertIsSleepingInsidePostgres);
+      waitUntil(closesAt.plusMillis(50));
+
+      HttpResponse<String> resultResponse = getApi("/api/v1/agendas/" + agendaId + "/result");
+
+      assertThat(voteResponse.get().statusCode()).isEqualTo(201);
+      assertThat(resultResponse.statusCode()).isEqualTo(200);
+      JsonNode result = objectMapper.readTree(resultResponse.body());
+      assertThat(result.get("yesVotes").asLong()).isOne();
+      assertThat(result.get("totalVotes").asLong()).isOne();
+    } finally {
+      removeDelayedVoteTrigger();
+    }
+  }
+
   private UUID createAgenda(String title) throws Exception {
     HttpResponse<String> response =
         post(
@@ -237,6 +273,73 @@ class VotingApiIntegrationTest {
 
   private URI uri(String path) {
     return URI.create("http://127.0.0.1:" + serverPort + path);
+  }
+
+  private Message receiveResultFor(UUID agendaId) {
+    return await()
+        .atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(200))
+        .until(
+            () -> {
+              Message message = rabbitTemplate.receive(RESULT_QUEUE, 100);
+              if (message == null) {
+                return null;
+              }
+              JsonNode event = objectMapper.readTree(message.getBody());
+              return agendaId.toString().equals(event.get("agendaId").asText()) ? message : null;
+            },
+            java.util.Objects::nonNull);
+  }
+
+  private void installDelayedVoteTrigger() {
+    jdbcTemplate.execute(
+        """
+        CREATE OR REPLACE FUNCTION delay_vote_insert()
+        RETURNS trigger
+        LANGUAGE plpgsql
+        AS $$
+        BEGIN
+          PERFORM pg_sleep(5);
+          RETURN NEW;
+        END;
+        $$
+        """);
+    jdbcTemplate.execute(
+        """
+        CREATE TRIGGER delay_vote_insert
+        BEFORE INSERT ON votes
+        FOR EACH ROW
+        EXECUTE FUNCTION delay_vote_insert()
+        """);
+  }
+
+  private boolean voteInsertIsSleepingInsidePostgres() {
+    return Boolean.TRUE.equals(
+        jdbcTemplate.queryForObject(
+            """
+            SELECT EXISTS (
+              SELECT 1
+              FROM pg_stat_activity
+              WHERE pid <> pg_backend_pid()
+                AND datname = current_database()
+                AND state = 'active'
+                AND wait_event = 'PgSleep'
+                AND query ILIKE '%INSERT INTO votes%'
+            )
+            """,
+            Boolean.class));
+  }
+
+  private void removeDelayedVoteTrigger() {
+    jdbcTemplate.execute("DROP TRIGGER IF EXISTS delay_vote_insert ON votes");
+    jdbcTemplate.execute("DROP FUNCTION IF EXISTS delay_vote_insert()");
+  }
+
+  private static void waitUntil(Instant instant) throws InterruptedException {
+    Duration remaining = Duration.between(Instant.now(), instant);
+    if (remaining.isPositive()) {
+      Thread.sleep(remaining);
+    }
   }
 
   private static void awaitStart(CountDownLatch start) {
