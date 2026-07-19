@@ -51,6 +51,7 @@ app:
     default-session-duration: PT1M
     maximum-session-duration: PT24H
     closure-poll-delay: PT1S
+    closure-batch-size: 100
   eligibility:
     base-url: ${ELIGIBILITY_BASE_URL:https://user-info.herokuapp.com}
     connect-timeout: PT2S
@@ -59,3 +60,9 @@ app:
     result-exchange: voting.results
     result-routing-key: voting.session.closed
     result-queue: voting.results.platform
+    relay-poll-delay: PT1S
+    relay-batch-size: 20
+    claim-lease: PT30S
+    initial-retry-delay: PT2S
+    maximum-retry-delay: PT5M
+    confirm-timeout: PT5S
