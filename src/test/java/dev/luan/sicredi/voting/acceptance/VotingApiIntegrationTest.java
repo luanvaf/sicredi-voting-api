@@ -35,6 +35,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
@@ -47,6 +48,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Testcontainers
 @ExtendWith(OutputCaptureExtension.class)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @SpringBootTest(
     classes = VotingApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
