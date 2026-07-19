@@ -53,7 +53,7 @@ app:
     closure-poll-delay: PT1S
     closure-batch-size: 100
   eligibility:
-    base-url: ${ELIGIBILITY_BASE_URL:https://user-info.herokuapp.com}
+    base-url: ${ELIGIBILITY_BASE_URL}
     connect-timeout: PT2S
     read-timeout: PT3S
   messaging:

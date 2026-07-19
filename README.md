@@ -75,8 +75,10 @@ docker compose down
 
 ## Run from Maven
 
-Start PostgreSQL, RabbitMQ, and an eligibility provider, then configure the
-connection variables documented in `.env.example`.
+Start PostgreSQL, RabbitMQ, and an eligibility provider, then configure every
+connection variable documented in `.env.example`. `ELIGIBILITY_BASE_URL` is
+required deliberately so the application fails during startup instead of
+silently using the discontinued challenge endpoint.
 
 On Windows:
 
