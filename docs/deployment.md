@@ -100,9 +100,12 @@ available. This repository includes a deterministic substitute under
 5. Store the Worker origin, without `/users/...`, as `ELIGIBILITY_BASE_URL` in
    Render.
 
-The Worker validates CPF check digits. Its deterministic able/unable decision is
-documented in the Worker README and exists only to make the discontinued
-challenge dependency reproducible.
+The Worker validates CPF check digits. Because the challenge does not define
+the business rule behind eligibility, the substitute reproduces its example
+fixtures: `19839091069` is able to vote, `62289608068` is unable to vote, and
+every other valid CPF is able to vote. This deterministic mapping exists only
+to make both outcomes of the discontinued dependency reproducible. It is
+documented prominently in the root README and in the Worker README.
 
 ### 2. Create the Neon database
 

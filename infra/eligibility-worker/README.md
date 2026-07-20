@@ -1,7 +1,21 @@
 # Eligibility Worker
 
 This Cloudflare Worker is a small deterministic substitute for the external
-associate eligibility service.
+associate eligibility service, whose URL in the original challenge is no
+longer available.
+
+The challenge defines both possible responses for a valid CPF but does not
+provide a business rule for deciding between them. This substitute therefore
+uses the challenge's own examples as deterministic test fixtures:
+
+| CPF | Response |
+| --- | --- |
+| `19839091069` | `ABLE_TO_VOTE` |
+| `62289608068` | `UNABLE_TO_VOTE` |
+| Any other valid CPF | `ABLE_TO_VOTE` |
+
+This mapping exists only to keep both integration outcomes reproducible. It is
+not intended to model a real associate eligibility rule.
 
 ## Contract
 
@@ -21,10 +35,8 @@ A valid CPF receives `200 OK` and one of these responses:
 { "status": "UNABLE_TO_VOTE" }
 ```
 
-The result is deterministic: a CPF whose last digit is even is able to vote,
-and a CPF whose last digit is odd is unable to vote. The Worker validates both
-CPF check digits and rejects formatted, repeated-digit, or otherwise invalid
-values with `404 Not Found`.
+The Worker validates both CPF check digits and rejects formatted,
+repeated-digit, or otherwise invalid values with `404 Not Found`.
 
 Unsupported paths also return `404 Not Found`. Methods other than `GET` return
 `405 Method Not Allowed`.

@@ -7,6 +7,29 @@ The API creates agendas, opens time-bound voting sessions, validates associate
 eligibility, accepts one vote per associate, calculates immutable results, and
 publishes finalized results to RabbitMQ through a transactional outbox.
 
+## Important: Eligibility Test Data
+
+The external eligibility service URL supplied in the challenge PDF is no
+longer available. The project therefore includes a deterministic Cloudflare
+Worker substitute that preserves the original HTTP contract.
+
+The PDF defines both `ABLE_TO_VOTE` and `UNABLE_TO_VOTE` for valid CPFs, but it
+does not specify the business rule that determines eligibility. To avoid
+rejecting an arbitrary portion of valid CPFs, the substitute uses the PDF's own
+examples as explicit test fixtures:
+
+| CPF | Simulated eligibility |
+| --- | --- |
+| `19839091069` | `ABLE_TO_VOTE` |
+| `62289608068` | `UNABLE_TO_VOTE` |
+| Any other mathematically valid CPF | `ABLE_TO_VOTE` |
+
+Use `19839091069` for the successful Swagger voting flow and `62289608068` to
+verify the `422 ASSOCIATE_NOT_ELIGIBLE` response. Invalid, formatted, or
+repeated-digit CPFs are rejected instead of being treated as eligible. This
+fixture mapping exists only because the original dependency is unavailable; it
+is not a real business eligibility rule.
+
 ## Live Deployment
 
 - Swagger UI: <https://sicredi-voting-api.onrender.com/swagger-ui.html>
@@ -45,9 +68,8 @@ The mandatory challenge and every proposed bonus are included:
 - OpenAPI documentation, health probes, Docker, CI, and free-tier deployment
   assets.
 
-The external eligibility URL from the original challenge is no longer
-available. A deterministic Cloudflare Worker substitute is included so the
-integration remains reproducible without weakening the HTTP boundary.
+The deterministic substitute described above keeps the discontinued external
+integration reproducible without weakening the HTTP boundary.
 
 ## Technology
 
@@ -148,7 +170,7 @@ After every service is healthy:
    `POST /api/v1/agendas/{agendaId}/voting-sessions` and
    `{"durationSeconds": 5}`.
 4. Cast a vote with `POST /api/v1/agendas/{agendaId}/votes`, using the valid
-   eligible payload `{"associateCpf": "93541134780", "choice": "YES"}`.
+   eligible payload `{"associateCpf": "19839091069", "choice": "YES"}`.
 5. Wait for the configured session duration and read the finalized result with
    `GET /api/v1/agendas/{agendaId}/result`.
 
@@ -248,7 +270,7 @@ POST /api/v1/agendas/{agendaId}/votes
 Content-Type: application/json
 
 {
-  "associateCpf": "93541134780",
+  "associateCpf": "19839091069",
   "choice": "YES"
 }
 ```
