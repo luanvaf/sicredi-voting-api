@@ -18,6 +18,18 @@ publishes finalized results to RabbitMQ through a transactional outbox.
 The hosted API uses free-tier infrastructure. Its first request after an idle
 period can take about a minute while Render and Neon resume their resources.
 
+## Domain Vocabulary
+
+The implementation keeps the challenge's business meaning while using
+consistent English terminology:
+
+| Challenge term | API term |
+| --- | --- |
+| Pauta | Agenda |
+| Sessão de votação | Voting session |
+| Associado | Associate |
+| Voto `Sim` / `Não` | Vote `YES` / `NO` |
+
 ## Delivered Scope
 
 The mandatory challenge and every proposed bonus are included:
