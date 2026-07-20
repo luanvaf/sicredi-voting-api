@@ -14,7 +14,7 @@ RUN --mount=type=cache,target=/root/.m2 \
     && cp "$(find target -maxdepth 1 -type f -name '*.jar' ! -name '*.original' -print -quit)" \
         /workspace/application.jar
 
-FROM eclipse-temurin:21-jre-alpine AS runtime
+FROM eclipse-temurin:25-jre-alpine AS runtime
 
 RUN apk add --no-cache wget \
     && addgroup --system --gid 10001 app \
