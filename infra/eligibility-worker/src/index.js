@@ -1,4 +1,5 @@
 const USER_PATH = /^\/users\/([^/]+)$/;
+const INELIGIBLE_CPFS = new Set(["62289608068"]);
 
 export default {
   async fetch(request) {
@@ -31,8 +32,9 @@ export default {
       return notFound();
     }
 
-    const status =
-      Number(cpf.at(-1)) % 2 === 0 ? "ABLE_TO_VOTE" : "UNABLE_TO_VOTE";
+    const status = INELIGIBLE_CPFS.has(cpf)
+      ? "UNABLE_TO_VOTE"
+      : "ABLE_TO_VOTE";
     return Response.json({ status });
   },
 };
