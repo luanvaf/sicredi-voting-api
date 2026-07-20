@@ -7,6 +7,17 @@ The API creates agendas, opens time-bound voting sessions, validates associate
 eligibility, accepts one vote per associate, calculates immutable results, and
 publishes finalized results to RabbitMQ through a transactional outbox.
 
+## Live Deployment
+
+- Swagger UI: <https://sicredi-voting-api.onrender.com/swagger-ui.html>
+- OpenAPI document: <https://sicredi-voting-api.onrender.com/v3/api-docs>
+- Health: <https://sicredi-voting-api.onrender.com/actuator/health>
+- Eligibility service health:
+  <https://sicredi-eligibility-worker.luanvaf.workers.dev/health>
+
+The hosted API uses free-tier infrastructure. Its first request after an idle
+period can take about a minute while Render and Neon resume their resources.
+
 ## Delivered Scope
 
 The mandatory challenge and every proposed bonus are included:
